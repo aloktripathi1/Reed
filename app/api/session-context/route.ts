@@ -1,0 +1,24 @@
+import { NextResponse } from 'next/server'
+import {
+  buildOpeningMessage,
+  getSessionContext,
+} from '@/lib/coaching-logic/session-context'
+import { createClient } from '@/lib/supabase/server'
+
+export async function GET() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const sessionContext = await getSessionContext(supabase, user.id)
+
+  return NextResponse.json({
+    openingMessage: buildOpeningMessage(sessionContext),
+    sessionContext,
+  })
+}
