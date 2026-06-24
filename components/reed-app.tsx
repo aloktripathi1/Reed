@@ -269,13 +269,13 @@ export function ReedApp({
             <ReedMark />
             <div>
               <strong>Reed</strong>
-              <span>Career mentor</span>
+              <span>Memory workspace</span>
             </div>
           </div>
 
           <div className="chat-header-actions">
             <span className={`status-pill ${isStreaming ? 'status-pill-live' : ''}`}>
-              {isStreaming ? 'Writing' : 'Ready'}
+              {isStreaming ? 'Thinking' : 'Ready'}
             </span>
             <span className="chat-user">{userEmail}</span>
             <button className="ghost-button" type="button" onClick={handleSignOut}>
@@ -316,6 +316,10 @@ export function ReedApp({
 
         <footer className="composer-wrap">
           <form className="composer" ref={formRef} onSubmit={handleSubmit}>
+            <div className="composer-label">
+              <span>Conversation</span>
+              <span>Reed remembers useful context automatically</span>
+            </div>
             {pendingAttachment && (
               <div className="composer-attachment">
                 <AttachmentChip filename={pendingAttachment.filename} onRemove={() => setPendingAttachment(null)} />

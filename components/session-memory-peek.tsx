@@ -224,32 +224,24 @@ export function SessionMemoryPeek({
   const { activeGoals, behavioralSignals, openCommitments, overdueCommitment, recentSessions } = sessionContext
 
   return (
-    <aside style={{
-      width: '248px', minWidth: '248px',
-      borderRight: '1px solid var(--border)',
-      background: 'var(--surface)',
-      display: 'flex', flexDirection: 'column',
-      overflowY: 'auto', flexShrink: 0,
-    }}>
+    <aside className="memory-sidebar">
 
       {/* Sidebar header */}
-      <div style={{
-        padding: '18px 22px 16px',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexShrink: 0,
-      }}>
-        <span style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: 850, letterSpacing: 0 }}>Reed</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#86efac' }} />
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Active</span>
+      <div className="memory-sidebar-header">
+        <div>
+          <span>Reed</span>
+          <p>Memory</p>
+        </div>
+        <div className="memory-live">
+          <span />
+          Active
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '26px', overflowY: 'auto' }}>
+      <div className="memory-sidebar-content">
 
-        <p className="type-label-xs" style={{ color: 'var(--text-faint)' }}>What Reed carries</p>
+        <p className="memory-eyebrow">What Reed carries</p>
 
         {/* Goals */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>

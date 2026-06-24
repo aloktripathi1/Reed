@@ -17,7 +17,6 @@ export default async function LoginPage({
       <main className="auth-main">
         <section className="auth-panel">
           <div className="auth-copy">
-            <p className="eyebrow">Private coaching workspace</p>
             <h1>Pick up where you left off.</h1>
             <p>Reed keeps your goals, patterns, and open commitments in view so each conversation can get straight to the useful part.</p>
           </div>
