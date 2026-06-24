@@ -12,9 +12,11 @@ export function LoginForm({
   nextPath: string
 }) {
   const router = useRouter()
+  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
   const [email, setEmail] = useState('maya@demo.reed')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
 
@@ -41,14 +43,29 @@ export function LoginForm({
     event.preventDefault()
     setIsSubmitting(true)
     setError(null)
+    setNotice(null)
 
     const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const authResult =
+      mode === 'sign-in'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+            },
+          })
 
     setIsSubmitting(false)
 
-    if (signInError) {
-      setError(signInError.message)
+    if (authResult.error) {
+      setError(authResult.error.message)
+      return
+    }
+
+    if (mode === 'sign-up' && !authResult.data.session) {
+      setNotice('Check your email to confirm your account, then come back to sign in.')
       return
     }
 
@@ -60,6 +77,33 @@ export function LoginForm({
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
+      <div className="auth-mode-toggle" aria-label="Choose authentication mode">
+        <button
+          className={mode === 'sign-in' ? 'active' : undefined}
+          onClick={() => {
+            setMode('sign-in')
+            setEmail((currentEmail) => currentEmail || 'maya@demo.reed')
+            setError(null)
+            setNotice(null)
+          }}
+          type="button"
+        >
+          Sign in
+        </button>
+        <button
+          className={mode === 'sign-up' ? 'active' : undefined}
+          onClick={() => {
+            setMode('sign-up')
+            setEmail('')
+            setError(null)
+            setNotice(null)
+          }}
+          type="button"
+        >
+          Sign up
+        </button>
+      </div>
+
       <button
         className="oauth-button"
         disabled={isGoogleSubmitting || isSubmitting}
@@ -93,10 +137,11 @@ export function LoginForm({
           required
           id="password"
           type="password"
-          autoComplete="current-password"
+          autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          minLength={6}
         />
       </div>
 
@@ -106,16 +151,22 @@ export function LoginForm({
         </div>
       ) : null}
 
+      {notice ? (
+        <div className="auth-notice">
+          {notice}
+        </div>
+      ) : null}
+
       <button
         className="primary-button"
         type="submit"
         disabled={isSubmitting || isGoogleSubmitting}
       >
-        {isSubmitting ? 'Signing in...' : 'Continue'}
+        {isSubmitting ? (mode === 'sign-in' ? 'Signing in...' : 'Creating account...') : mode === 'sign-in' ? 'Continue' : 'Create account'}
       </button>
 
       <p className="auth-demo">
-        Demo: maya@demo.reed · reed-demo-2024
+        Want to try it first? Use maya@demo.reed · reed-demo-2024
       </p>
     </form>
   )

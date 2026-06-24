@@ -24,8 +24,8 @@ export default async function LoginPage({
 
           <div className="auth-card">
             <div className="auth-card-header">
-              <h2>Welcome back</h2>
-              <p>Use the demo credentials or your Reed account.</p>
+              <h2>Welcome to Reed</h2>
+              <p>Sign in, create an account, or continue with Google.</p>
             </div>
             <LoginForm initialError={params?.error ?? null} nextPath={params?.next ?? '/chat'} />
           </div>
