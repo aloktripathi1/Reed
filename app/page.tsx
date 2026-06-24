@@ -47,8 +47,7 @@ export default function HomePage() {
       <header className="site-header">
         <Link className="wordmark" href="/">Reed</Link>
         <nav>
-          <Link href="/login">Sign in</Link>
-          <Link className="nav-cta" href="/login">Start</Link>
+          <Link className="nav-cta" href="/login">Sign in</Link>
         </nav>
       </header>
 
@@ -62,7 +61,6 @@ export default function HomePage() {
             </p>
             <div className="hero-actions">
               <Link className="primary-link" href="/login">Start a conversation</Link>
-              <span>No intake form. No blank slate.</span>
             </div>
           </div>
           <ProductPreview />
