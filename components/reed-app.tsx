@@ -3,46 +3,16 @@
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionContext } from '@/lib/coaching-logic/session-context'
 import { createClient } from '@/lib/supabase/client'
 import { SessionMemoryPeek } from '@/components/session-memory-peek'
 
-type ThemeMode = 'light' | 'dark'
 type PendingAttachment = { filename: string; text: string }
 type AccountMenuPosition = { left: number; top: number }
 
-const THEME_CHANGE_EVENT = 'reed-theme-change'
 const MAX_ATTACHMENTS = 3
-
-function getThemeSnapshot(): ThemeMode {
-  if (typeof window === 'undefined') return 'light'
-
-  const savedTheme = window.localStorage.getItem('reed-theme')
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  return savedTheme === 'dark' || (!savedTheme && prefersDark) ? 'dark' : 'light'
-}
-
-function subscribeToThemeChange(onStoreChange: () => void) {
-  window.addEventListener('storage', onStoreChange)
-  window.addEventListener(THEME_CHANGE_EVENT, onStoreChange)
-
-  return () => {
-    window.removeEventListener('storage', onStoreChange)
-    window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange)
-  }
-}
-
-function getServerThemeSnapshot(): ThemeMode {
-  return 'light'
-}
-
-function saveTheme(theme: ThemeMode) {
-  window.localStorage.setItem('reed-theme', theme)
-  document.documentElement.dataset.theme = theme
-  window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
-}
 
 function getMessageText(message: UIMessage) {
   return message.parts
@@ -198,7 +168,6 @@ export function ReedApp({
   const [sessionContext, setSessionContext] = useState(initialSessionContext)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [accountMenuPosition, setAccountMenuPosition] = useState<AccountMenuPosition | null>(null)
-  const theme = useSyncExternalStore(subscribeToThemeChange, getThemeSnapshot, getServerThemeSnapshot)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -214,10 +183,6 @@ export function ReedApp({
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
-  }
-
-  function toggleTheme() {
-    saveTheme(theme === 'dark' ? 'light' : 'dark')
   }
 
   function updateAccountMenuPosition() {
@@ -281,11 +246,6 @@ export function ReedApp({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, status])
-
-  useEffect(() => {
-    window.localStorage.setItem('reed-theme', theme)
-    document.documentElement.dataset.theme = theme
-  }, [theme])
 
   useEffect(() => {
     function handleDocumentPointerDown(event: PointerEvent) {
@@ -453,30 +413,6 @@ export function ReedApp({
             <span className={`status-pill ${isStreaming ? 'status-pill-live' : ''}`}>
               {isStreaming ? 'Thinking' : 'Ready'}
             </span>
-            <button
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              className="theme-toggle"
-              onClick={toggleTheme}
-              type="button"
-            >
-              {theme === 'dark' ? (
-                <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="m4.93 4.93 1.41 1.41" />
-                  <path d="m17.66 17.66 1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="m6.34 17.66-1.41 1.41" />
-                  <path d="m19.07 4.93-1.41 1.41" />
-                </svg>
-              ) : (
-                <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
-                  <path d="M12 3a6 6 0 0 0 9 7.4A9 9 0 1 1 12 3Z" />
-                </svg>
-              )}
-            </button>
             <div className="account-menu">
               <button
                 aria-expanded={isAccountMenuOpen}

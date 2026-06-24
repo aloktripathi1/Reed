@@ -19,7 +19,7 @@ export function LoginForm({
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
-  const [email, setEmail] = useState('maya@demo.reed')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -167,7 +167,7 @@ export function LoginForm({
             <button
               onClick={() => {
                 setMode('sign-in')
-                setEmail((currentEmail) => currentEmail || 'maya@demo.reed')
+                setEmail('')
                 setPassword('')
                 setError(null)
                 setNotice(null)
