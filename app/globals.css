@@ -25,6 +25,30 @@
   --landing-width:  1180px;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:             #111713;
+  --surface:        #18221d;
+  --surface-soft:   #202b25;
+  --surface-warm:   #2c261d;
+  --border:         #2b3a32;
+  --border-strong:  #3d5046;
+  --text-primary:   #eef5ef;
+  --text-secondary: #b7c5bb;
+  --text-muted:     #8fa096;
+  --text-faint:     #66756c;
+  --accent:         #70b99e;
+  --accent-dark:    #9bd5bf;
+  --accent-bg:      #1d332a;
+  --accent-light:   #17261f;
+  --gold:           #e0a256;
+  --blue:           #8fb7dc;
+  --danger:         #ff9b92;
+  --danger-bg:      #3a1e1d;
+  --shadow-card:    0 18px 50px rgba(0,0,0,0.34), 0 2px 10px rgba(0,0,0,0.22);
+  --shadow-soft:    0 10px 30px rgba(0,0,0,0.26);
+}
+
 /* ── Type scale ──────────────────────────────────────────────── */
 @utility type-display-xl {
   font-family: var(--font-display), Georgia, serif;
@@ -136,6 +160,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
   color: var(--text-primary);
+  transition: background 180ms ease, color 180ms ease;
 }
 
 button,
@@ -948,6 +973,129 @@ textarea {
   gap: 12px;
 }
 
+.theme-toggle,
+.account-button {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 40px;
+  justify-content: center;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  width: 40px;
+}
+
+.theme-toggle:hover,
+.account-button:hover {
+  background: var(--accent-bg);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.theme-toggle {
+  border-radius: 12px;
+}
+
+.account-menu {
+  position: relative;
+}
+
+.account-button {
+  border-radius: 50%;
+}
+
+.account-button span,
+.account-avatar {
+  align-items: center;
+  background: var(--accent);
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 850;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.account-popover {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  min-width: 258px;
+  padding: 10px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 30;
+}
+
+.account-popover::before {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  content: "";
+  height: 10px;
+  position: absolute;
+  right: 15px;
+  top: -6px;
+  transform: rotate(45deg);
+  width: 10px;
+}
+
+.account-popover-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  padding: 8px 8px 12px;
+}
+
+.account-popover-header strong {
+  color: var(--text-primary);
+  display: block;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.account-popover-header p {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 3px 0 0;
+  max-width: 178px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-popover button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.account-popover button:hover {
+  background: var(--surface-soft);
+  color: var(--text-primary);
+}
+
 .reed-mark {
   align-items: center;
   background: var(--accent-bg);
@@ -1044,6 +1192,10 @@ textarea {
   white-space: pre-wrap;
 }
 
+.message-bubble strong {
+  font-weight: 850;
+}
+
 .message-bubble-reed {
   background: rgba(255,255,255,0.48);
   border: 1px solid rgba(223,231,221,0.78);
@@ -1064,6 +1216,9 @@ textarea {
 }
 
 .message-attachment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
@@ -1151,6 +1306,9 @@ textarea {
 }
 
 .composer-attachment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -1266,6 +1424,75 @@ textarea {
   height: 20px;
   padding: 0;
   width: 20px;
+}
+
+:root[data-theme="dark"] .memory-sidebar {
+  background:
+    linear-gradient(180deg, rgba(24,34,29,0.98), rgba(17,23,19,0.98)),
+    var(--surface);
+}
+
+:root[data-theme="dark"] .memory-live {
+  border-color: #315243;
+}
+
+:root[data-theme="dark"] .chat-shell {
+  background:
+    radial-gradient(circle at 68% 12%, rgba(112,185,158,0.12), transparent 30%),
+    var(--bg);
+}
+
+:root[data-theme="dark"] .chat-main {
+  background:
+    linear-gradient(180deg, rgba(20,29,24,0.74), rgba(17,23,19,0.96)),
+    var(--bg);
+}
+
+:root[data-theme="dark"] .chat-header,
+:root[data-theme="dark"] .composer-wrap,
+:root[data-theme="dark"] .site-header {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+:root[data-theme="dark"] .reed-mark {
+  border-color: #315243;
+}
+
+:root[data-theme="dark"] .status-pill,
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .account-button {
+  border-color: #315243;
+}
+
+:root[data-theme="dark"] .account-button span,
+:root[data-theme="dark"] .account-avatar {
+  color: #08140f;
+}
+
+:root[data-theme="dark"] .message-bubble-reed {
+  background: rgba(24,34,29,0.72);
+  border-color: rgba(61,80,70,0.86);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.16);
+}
+
+:root[data-theme="dark"] .message-bubble-user {
+  background: #2f6f5e;
+  border-color: #5ba88d;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+  color: #fff;
+}
+
+:root[data-theme="dark"] .nudge-note {
+  background: #2a241b;
+  border-color: #5a4329;
+  border-left-color: var(--gold);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.20);
+}
+
+:root[data-theme="dark"] .composer-box,
+:root[data-theme="dark"] .typing-indicator,
+:root[data-theme="dark"] .attachment-chip {
+  box-shadow: 0 18px 42px rgba(0,0,0,0.22);
 }
 
 /* ── Animations ──────────────────────────────────────────────── */

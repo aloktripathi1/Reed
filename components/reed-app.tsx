@@ -3,10 +3,44 @@
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react'
 import type { SessionContext } from '@/lib/coaching-logic/session-context'
 import { createClient } from '@/lib/supabase/client'
 import { SessionMemoryPeek } from '@/components/session-memory-peek'
+
+type ThemeMode = 'light' | 'dark'
+type PendingAttachment = { filename: string; text: string }
+
+const THEME_CHANGE_EVENT = 'reed-theme-change'
+const MAX_ATTACHMENTS = 3
+
+function getThemeSnapshot(): ThemeMode {
+  if (typeof window === 'undefined') return 'light'
+
+  const savedTheme = window.localStorage.getItem('reed-theme')
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  return savedTheme === 'dark' || (!savedTheme && prefersDark) ? 'dark' : 'light'
+}
+
+function subscribeToThemeChange(onStoreChange: () => void) {
+  window.addEventListener('storage', onStoreChange)
+  window.addEventListener(THEME_CHANGE_EVENT, onStoreChange)
+
+  return () => {
+    window.removeEventListener('storage', onStoreChange)
+    window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange)
+  }
+}
+
+function getServerThemeSnapshot(): ThemeMode {
+  return 'light'
+}
+
+function saveTheme(theme: ThemeMode) {
+  window.localStorage.setItem('reed-theme', theme)
+  document.documentElement.dataset.theme = theme
+  window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
+}
 
 function getMessageText(message: UIMessage) {
   return message.parts
@@ -15,12 +49,41 @@ function getMessageText(message: UIMessage) {
     .join('\n')
 }
 
+function MarkdownText({ text }: { text: string }) {
+  const segments = text.split(/(\*\*[^*]+\*\*)/g)
+
+  return (
+    <>
+      {segments.map((segment, index) => {
+        if (segment.startsWith('**') && segment.endsWith('**')) {
+          return <strong key={`${segment}-${index}`}>{segment.slice(2, -2)}</strong>
+        }
+
+        return segment
+      })}
+    </>
+  )
+}
+
 function ReedMark({ size = 34 }: { size?: number }) {
   return (
     <div className="reed-mark" style={{ height: size, width: size }}>
       <span />
     </div>
   )
+}
+
+function getInitial(email: string) {
+  return email.trim().charAt(0).toUpperCase() || 'U'
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    throw new Error('The upload service returned an unexpected response. Please try again.')
+  }
+
+  return response.json() as Promise<T>
 }
 
 function AttachmentChip({
@@ -50,13 +113,13 @@ function AttachmentChip({
 }
 
 function MessageBubble({
-  attachmentFilename,
+  attachmentFilenames,
   isNudge,
   message,
   text,
   time,
 }: {
-  attachmentFilename?: string
+  attachmentFilenames?: string[]
   isNudge: boolean
   message: UIMessage
   text: string
@@ -80,12 +143,18 @@ function MessageBubble({
       {!isUser && <ReedMark size={28} />}
       <div className="message-stack">
         <div className={`message-bubble ${isUser ? 'message-bubble-user' : 'message-bubble-reed'}`}>
-          {attachmentFilename && (
+          {attachmentFilenames && attachmentFilenames.length > 0 && (
             <div className={text.trim() ? 'message-attachment' : undefined}>
-              <AttachmentChip filename={attachmentFilename} />
+              {attachmentFilenames.map((filename) => (
+                <AttachmentChip filename={filename} key={filename} />
+              ))}
             </div>
           )}
-          {text.trim() && <p>{text}</p>}
+          {text.trim() && (
+            <p>
+              <MarkdownText text={text} />
+            </p>
+          )}
         </div>
         <span className="message-time">{time}</span>
       </div>
@@ -121,15 +190,18 @@ export function ReedApp({
 }) {
   const router = useRouter()
   const [input, setInput] = useState('')
-  const [pendingAttachment, setPendingAttachment] = useState<{ filename: string; text: string } | null>(null)
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
-  const [messageAttachments, setMessageAttachments] = useState<Record<number, string>>({})
+  const [messageAttachments, setMessageAttachments] = useState<Record<number, string[]>>({})
   const [sessionContext, setSessionContext] = useState(initialSessionContext)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const theme = useSyncExternalStore(subscribeToThemeChange, getThemeSnapshot, getServerThemeSnapshot)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const formRef = useRef<HTMLFormElement | null>(null)
-  const sendingAttachmentRef = useRef<{ filename: string; text: string } | null>(null)
+  const accountMenuRef = useRef<HTMLDivElement | null>(null)
+  const sendingAttachmentsRef = useRef<PendingAttachment[]>([])
   const hasHydratedRef = useRef(false)
   const [isRefreshingContext, startRefreshTransition] = useTransition()
 
@@ -138,6 +210,10 @@ export function ReedApp({
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
+  }
+
+  function toggleTheme() {
+    saveTheme(theme === 'dark' ? 'light' : 'dark')
   }
 
   const { messages, sendMessage, status, error } = useChat({
@@ -158,8 +234,16 @@ export function ReedApp({
         openingMessage: initialOpeningMessage,
         overdueCommitmentId: initialOverdueCommitmentId,
         sessionId: initialSessionId,
-        attachmentFilename: sendingAttachmentRef.current?.filename ?? null,
-        attachmentText: sendingAttachmentRef.current?.text ?? null,
+        attachmentFilename:
+          sendingAttachmentsRef.current.length > 0
+            ? sendingAttachmentsRef.current.map((attachment) => attachment.filename).join(', ')
+            : null,
+        attachmentText:
+          sendingAttachmentsRef.current.length > 0
+            ? sendingAttachmentsRef.current
+                .map((attachment) => `[Attached: ${attachment.filename}]\n${attachment.text}`)
+                .join('\n\n')
+            : null,
       }),
     }),
   })
@@ -167,6 +251,32 @@ export function ReedApp({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, status])
+
+  useEffect(() => {
+    window.localStorage.setItem('reed-theme', theme)
+    document.documentElement.dataset.theme = theme
+  }, [theme])
+
+  useEffect(() => {
+    function handleDocumentPointerDown(event: PointerEvent) {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false)
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsAccountMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('pointerdown', handleDocumentPointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [])
 
   useEffect(() => {
     if (!hasHydratedRef.current) {
@@ -200,54 +310,71 @@ export function ReedApp({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = input.trim()
-    if ((!trimmed && !pendingAttachment) || status !== 'ready') return
+    if ((!trimmed && pendingAttachments.length === 0) || status !== 'ready') return
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
 
-    const attachmentSnapshot = pendingAttachment
-    if (attachmentSnapshot) {
-      setMessageAttachments((prev) => ({ ...prev, [messages.length]: attachmentSnapshot.filename }))
+    const attachmentSnapshot = pendingAttachments
+    if (attachmentSnapshot.length > 0) {
+      setMessageAttachments((prev) => ({
+        ...prev,
+        [messages.length]: attachmentSnapshot.map((attachment) => attachment.filename),
+      }))
     }
 
-    sendingAttachmentRef.current = attachmentSnapshot
+    sendingAttachmentsRef.current = attachmentSnapshot
     setInput('')
-    setPendingAttachment(null)
+    setPendingAttachments([])
     setAttachmentError(null)
     await sendMessage({ text: trimmed || ' ' })
-    sendingAttachmentRef.current = null
+    sendingAttachmentsRef.current = []
+  }
+
+  async function extractAttachment(file: File): Promise<PendingAttachment> {
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch('/api/extract-pdf', { method: 'POST', body: formData })
+      const payload = await readJsonResponse<{ text?: string; error?: string }>(response)
+      if (!response.ok || !payload.text) {
+        throw new Error(payload.error ?? 'Could not read that PDF.')
+      }
+      return { filename: file.name, text: payload.text }
+    }
+
+    if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
+      return { filename: file.name, text: await file.text() }
+    }
+
+    throw new Error('Attach .txt or .pdf files.')
   }
 
   async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
+    const selectedFiles = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (!file) return
+    if (selectedFiles.length === 0) return
 
     setAttachmentError(null)
 
+    const availableSlots = MAX_ATTACHMENTS - pendingAttachments.length
+    if (availableSlots <= 0 || selectedFiles.length > availableSlots) {
+      setAttachmentError(`You can attach up to ${MAX_ATTACHMENTS} files at once.`)
+      return
+    }
+
     try {
-      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-        const formData = new FormData()
-        formData.append('file', file)
-        const response = await fetch('/api/extract-pdf', { method: 'POST', body: formData })
-        const payload = (await response.json()) as { text?: string; error?: string }
-        if (!response.ok || !payload.text) {
-          throw new Error(payload.error ?? 'Could not read that PDF.')
-        }
-        setPendingAttachment({ filename: file.name, text: payload.text })
-        return
-      }
-
-      if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
-        setPendingAttachment({ filename: file.name, text: await file.text() })
-        return
-      }
-
-      throw new Error('Attach a .txt or .pdf file.')
+      const attachments = await Promise.all(selectedFiles.map(extractAttachment))
+      setPendingAttachments((currentAttachments) => [...currentAttachments, ...attachments])
     } catch (readError) {
-      setPendingAttachment(null)
       setAttachmentError(readError instanceof Error ? readError.message : 'Could not read that file.')
     }
+  }
+
+  function removePendingAttachment(filename: string) {
+    setPendingAttachments((currentAttachments) =>
+      currentAttachments.filter((attachment) => attachment.filename !== filename)
+    )
   }
 
   function msgTime(index: number): string {
@@ -258,6 +385,7 @@ export function ReedApp({
   const isStreaming = status === 'streaming'
   const isSubmitted = status === 'submitted'
   const isReady = status === 'ready'
+  const hasUserMessage = messages.some((message) => String(message.role) === 'user')
 
   return (
     <div className="chat-shell">
@@ -277,10 +405,60 @@ export function ReedApp({
             <span className={`status-pill ${isStreaming ? 'status-pill-live' : ''}`}>
               {isStreaming ? 'Thinking' : 'Ready'}
             </span>
-            <span className="chat-user">{userEmail}</span>
-            <button className="ghost-button" type="button" onClick={handleSignOut}>
-              Sign out
+            <button
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              className="theme-toggle"
+              onClick={toggleTheme}
+              type="button"
+            >
+              {theme === 'dark' ? (
+                <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>
+              ) : (
+                <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
+                  <path d="M12 3a6 6 0 0 0 9 7.4A9 9 0 1 1 12 3Z" />
+                </svg>
+              )}
             </button>
+            <div className="account-menu" ref={accountMenuRef}>
+              <button
+                aria-expanded={isAccountMenuOpen}
+                aria-label="Open account menu"
+                className="account-button"
+                onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+                type="button"
+              >
+                <span>{getInitial(userEmail)}</span>
+              </button>
+              {isAccountMenuOpen && (
+                <div className="account-popover" role="menu">
+                  <div className="account-popover-header">
+                    <span className="account-avatar">{getInitial(userEmail)}</span>
+                    <div>
+                      <strong>Signed in</strong>
+                      <p>{userEmail}</p>
+                    </div>
+                  </div>
+                  <button onClick={handleSignOut} role="menuitem" type="button">
+                    <svg aria-hidden="true" fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="16">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <path d="m16 17 5-5-5-5" />
+                      <path d="M21 12H9" />
+                    </svg>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -289,10 +467,19 @@ export function ReedApp({
             {messages.map((message, index) => {
               const text = getMessageText(message)
               const isNudge = index === 0 && message.role === 'assistant' && initialOverdueCommitmentId !== null
+              const isDefaultOpening =
+                index === 0 &&
+                message.role === 'assistant' &&
+                initialOverdueCommitmentId === null &&
+                text.trim() === initialOpeningMessage.trim()
+
+              if (hasUserMessage && isDefaultOpening) {
+                return null
+              }
 
               return (
                 <MessageBubble
-                  attachmentFilename={messageAttachments[index]}
+                  attachmentFilenames={messageAttachments[index]}
                   isNudge={isNudge}
                   key={message.id}
                   message={message}
@@ -320,9 +507,15 @@ export function ReedApp({
               <span>Conversation</span>
               <span>Reed remembers useful context automatically</span>
             </div>
-            {pendingAttachment && (
+            {pendingAttachments.length > 0 && (
               <div className="composer-attachment">
-                <AttachmentChip filename={pendingAttachment.filename} onRemove={() => setPendingAttachment(null)} />
+                {pendingAttachments.map((attachment) => (
+                  <AttachmentChip
+                    filename={attachment.filename}
+                    key={attachment.filename}
+                    onRemove={() => removePendingAttachment(attachment.filename)}
+                  />
+                ))}
               </div>
             )}
 
@@ -330,6 +523,7 @@ export function ReedApp({
               <input
                 ref={fileInputRef}
                 accept=".txt,.pdf,text/plain,application/pdf"
+                multiple
                 onChange={handleFileSelect}
                 type="file"
               />
@@ -359,7 +553,7 @@ export function ReedApp({
               <button
                 aria-label="Send message"
                 className="send-button"
-                disabled={!isReady || (!input.trim() && !pendingAttachment)}
+                disabled={!isReady || (!input.trim() && pendingAttachments.length === 0)}
                 type="submit"
               >
                 <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 18 18" width="18">

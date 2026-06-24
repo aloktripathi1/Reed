@@ -109,6 +109,52 @@ async function getOrCreateDemoUser() {
 async function seedLedger(userId: string) {
   const admin = createAdminClient()
 
+  const { data: existingSessions, error: sessionsLookupError } = await admin
+    .from('sessions')
+    .select('id')
+    .eq('user_id', userId)
+
+  if (sessionsLookupError) throw sessionsLookupError
+
+  const existingSessionIds = (existingSessions ?? []).map((session) => session.id)
+
+  if (existingSessionIds.length > 0) {
+    const { error: messagesDeleteError } = await admin
+      .from('messages')
+      .delete()
+      .in('session_id', existingSessionIds)
+
+    if (messagesDeleteError) throw messagesDeleteError
+  }
+
+  const { error: commitmentsDeleteError } = await admin
+    .from('commitments')
+    .delete()
+    .eq('user_id', userId)
+
+  if (commitmentsDeleteError) throw commitmentsDeleteError
+
+  const { error: sessionsDeleteError } = await admin
+    .from('sessions')
+    .delete()
+    .eq('user_id', userId)
+
+  if (sessionsDeleteError) throw sessionsDeleteError
+
+  const { error: signalsDeleteError } = await admin
+    .from('behavioral_signals')
+    .delete()
+    .eq('user_id', userId)
+
+  if (signalsDeleteError) throw signalsDeleteError
+
+  const { error: goalsDeleteError } = await admin
+    .from('goals')
+    .delete()
+    .eq('user_id', userId)
+
+  if (goalsDeleteError) throw goalsDeleteError
+
   const twelveDaysAgo = isoDaysAgo(12)
   const fiveDaysAgo = isoDaysAgo(5)
 

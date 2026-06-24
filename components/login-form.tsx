@@ -4,6 +4,12 @@ import { useRouter } from 'next/navigation'
 import { startTransition, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+function getAuthCallbackUrl(nextPath: string) {
+  const callbackUrl = new URL('/auth/callback', window.location.origin)
+  callbackUrl.searchParams.set('next', nextPath)
+  return callbackUrl.toString()
+}
+
 export function LoginForm({
   initialError,
   nextPath,
@@ -25,7 +31,7 @@ export function LoginForm({
     setError(null)
 
     const supabase = createClient()
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+    const redirectTo = getAuthCallbackUrl(nextPath)
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -53,7 +59,7 @@ export function LoginForm({
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+              emailRedirectTo: getAuthCallbackUrl(nextPath),
             },
           })
 

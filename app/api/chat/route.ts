@@ -1,5 +1,5 @@
 import { anthropic } from '@ai-sdk/anthropic'
-import { convertToModelMessages, streamText, type UIMessage } from 'ai'
+import { streamText, type ModelMessage, type UIMessage } from 'ai'
 import { buildSystemPrompt } from '@/lib/chat/prompt'
 import { PERSONA_MODEL } from '@/lib/chat/models'
 import { getSessionContext } from '@/lib/coaching-logic/session-context'
@@ -24,6 +24,42 @@ function getLatestUserText(messages: UIMessage[]) {
 
 function isMissingAttachmentColumnError(error: { message?: string } | null) {
   return Boolean(error?.message?.includes('attachment_'))
+}
+
+function inlineAttachmentForModel(message: {
+  attachment_filename: string | null
+  attachment_text: string | null
+  content: string
+  role: 'user' | 'assistant'
+}): ModelMessage {
+  const content = message.attachment_text?.trim()
+    ? [
+        message.content,
+        `[Attached: ${message.attachment_filename ?? 'attachment'}]\n${message.attachment_text}`,
+      ]
+        .filter((part) => part.trim())
+        .join('\n\n')
+    : message.content
+
+  return {
+    role: message.role,
+    content,
+  }
+}
+
+async function getSessionModelMessages(sessionId: string): Promise<ModelMessage[]> {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('messages')
+    .select('role, content, attachment_filename, attachment_text, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []).map(inlineAttachmentForModel)
 }
 
 async function ensureSessionExists({
@@ -145,27 +181,7 @@ export async function POST(request: Request) {
   }
 
   const sessionContext = await getSessionContext(supabase, user.id)
-  let modelMessages = await convertToModelMessages(messages)
-
-  if (attachmentText) {
-    const lastUserIdx = modelMessages.reduce((acc, msg, index) => (msg.role === 'user' ? index : acc), -1)
-    if (lastUserIdx !== -1) {
-      const injectedText = `\n\n[Attached file: ${attachmentFilename ?? 'attachment'}]\n${attachmentText}`
-      modelMessages = modelMessages.map((message, index) => {
-        if (index !== lastUserIdx || message.role !== 'user') {
-          return message
-        }
-
-        return {
-          ...message,
-          content:
-            typeof message.content === 'string'
-              ? message.content + injectedText
-              : [...message.content, { type: 'text' as const, text: injectedText }],
-        }
-      })
-    }
-  }
+  const modelMessages = await getSessionModelMessages(sessionId)
 
   const result = streamText({
     model: anthropic(PERSONA_MODEL),
