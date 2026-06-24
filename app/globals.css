@@ -22,7 +22,7 @@
   --danger-bg:      #fff1f0;
   --shadow-card:    0 18px 50px rgba(23,33,27,0.10), 0 2px 10px rgba(23,33,27,0.06);
   --shadow-soft:    0 10px 30px rgba(23,33,27,0.08);
-  --landing-width:  1280px;
+  --landing-width:  1180px;
 }
 
 /* ── Type scale ──────────────────────────────────────────────── */
@@ -276,16 +276,16 @@ textarea {
 .hero-section {
   align-items: center;
   display: grid;
-  gap: clamp(40px, 5vw, 72px);
-  grid-template-columns: minmax(390px, 0.9fr) minmax(500px, 1.1fr);
+  gap: clamp(32px, 6vw, 78px);
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
   margin: 0 auto;
   max-width: var(--landing-width);
   min-height: calc(100vh - 64px);
-  padding: clamp(38px, 7vw, 82px) clamp(28px, 4vw, 48px);
+  padding: clamp(32px, 7vw, 82px) clamp(24px, 4vw, 44px);
 }
 
 .hero-copy {
-  max-width: 625px;
+  max-width: 560px;
 }
 
 .hero-copy h1 {
@@ -325,7 +325,7 @@ textarea {
   grid-template-columns: repeat(3, 1fr);
   margin: 0 auto;
   max-width: var(--landing-width);
-  padding: 0 clamp(28px, 4vw, 48px);
+  padding: 0 clamp(24px, 4vw, 44px);
 }
 
 .proof-strip div {
@@ -528,7 +528,7 @@ textarea {
   grid-template-columns: minmax(0, 0.8fr) minmax(420px, 1fr);
   margin: 0 auto;
   max-width: var(--landing-width);
-  padding: clamp(58px, 8vw, 96px) clamp(28px, 4vw, 48px);
+  padding: clamp(58px, 8vw, 96px) clamp(24px, 4vw, 44px);
 }
 
 .workflow-copy h2,
