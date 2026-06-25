@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { PDFParse } from 'pdf-parse'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 
@@ -31,11 +30,12 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer())
 
     let text: string
+    let parser: { getText: () => Promise<{ text?: string }>; destroy: () => Promise<void> } | undefined
     try {
-      const parser = new PDFParse({ data: buffer })
+      const { PDFParse } = await import('pdf-parse')
+      parser = new PDFParse({ data: buffer })
       const result = await parser.getText()
       text = result.text ?? ''
-      await parser.destroy()
     } catch {
       return NextResponse.json(
         {
@@ -44,6 +44,8 @@ export async function POST(request: Request) {
         },
         { status: 422 }
       )
+    } finally {
+      await parser?.destroy().catch(() => undefined)
     }
 
     // Fewer than 40 non-whitespace characters means the PDF is effectively image-only.
